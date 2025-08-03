@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import PdfViewer from '../components/PdfViewer'
-import PinTable from '../components/PinTable'
 import RulesList from '../components/RulesList'
 
 export default function Home() {
@@ -14,6 +13,8 @@ export default function Home() {
   const [showDropdown, setShowDropdown] = useState(false)
   const [leftWidth, setLeftWidth] = useState(50)
   const [isResizing, setIsResizing] = useState(false)
+  const [pdfUrl, setPdfUrl] = useState(null)
+  const [pdfLoading, setPdfLoading] = useState(false)
   const containerRef = useRef()
   const searchRef = useRef()
 
@@ -75,6 +76,7 @@ export default function Home() {
 
   async function fetchPartData(partId) {
     setLoading(true)
+    setPdfUrl(null)
     try {
       const { data: partData, error: partError } = await supabase
         .from('schematic_part')
@@ -101,10 +103,32 @@ export default function Home() {
 
       setPartData(partData)
       setRules(rulesData || [])
+
+      if (partData.file_path) {
+        await fetchPresignedUrl(partData.file_path)
+      }
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function fetchPresignedUrl(filePath) {
+    setPdfLoading(true)
+    try {
+      const response = await fetch(`/api/presigned-url?filePath=${encodeURIComponent(filePath)}`)
+      const data = await response.json()
+      
+      if (response.ok) {
+        setPdfUrl(data.url)
+      } else {
+        console.error('Error getting presigned URL:', data.error)
+      }
+    } catch (error) {
+      console.error('Error fetching presigned URL:', error)
+    } finally {
+      setPdfLoading(false)
     }
   }
 
@@ -151,9 +175,30 @@ export default function Home() {
           Datasheet Viewer{partData ? `: Part ${partData.part_id}` : ''}
         </h2>
         
-        {partData?.datasheet_url ? (
+        {pdfLoading ? (
+          <div style={{ 
+            padding: '40px', 
+            textAlign: 'center', 
+            color: '#6c757d',
+            fontSize: '16px'
+          }}>
+            🔄 Loading datasheet...
+          </div>
+        ) : pdfUrl ? (
           <div style={{ flex: 1, overflow: 'hidden' }}>
-            <PdfViewer url={partData.datasheet_url} />
+            <PdfViewer url={pdfUrl} />
+          </div>
+        ) : partData?.file_path ? (
+          <div style={{ 
+            padding: '40px', 
+            textAlign: 'center', 
+            border: '2px dashed #ddd',
+            borderRadius: '8px',
+            backgroundColor: '#f8f9fa',
+            color: '#dc3545',
+            fontSize: '16px'
+          }}>
+            ❌ Failed to load datasheet
           </div>
         ) : partData ? (
           <div style={{ 
@@ -165,7 +210,7 @@ export default function Home() {
             color: '#6c757d',
             fontSize: '16px'
           }}>
-            📄 Datasheet URL not found!
+            📄 Datasheet file not found!
           </div>
         ) : (
           <div style={{ 
