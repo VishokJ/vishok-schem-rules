@@ -316,9 +316,9 @@ export default function Home() {
         
         {partData && (
           <div style={{ animation: 'fadeIn 0.3s ease-in' }}>
-            {partData.pin_table && (
+            {/* {partData.pin_table && (
               <PinTable pinData={partData.pin_table} />
-            )}
+            )} */}
             
             {rules.length > 0 && (
               <RulesList rules={rules} />
