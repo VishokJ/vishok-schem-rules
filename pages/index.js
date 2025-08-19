@@ -15,6 +15,7 @@ export default function Home() {
   const [isResizing, setIsResizing] = useState(false)
   const [pdfUrl, setPdfUrl] = useState(null)
   const [pdfLoading, setPdfLoading] = useState(false)
+  const [partsLoading, setPartsLoading] = useState(false)
   const containerRef = useRef()
   const searchRef = useRef()
 
@@ -62,15 +63,37 @@ export default function Home() {
   }, [])
 
   async function fetchParts() {
+    setPartsLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('schematic_part')
-        .select('part_id')
+      // Fetch all parts using pagination to work around Supabase 1000 row limit
+      let allParts = []
+      let page = 0
+      const pageSize = 1000
+      let hasMore = true
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('schematic_part')
+          .select('part_id')
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+        
+        if (error) throw error
+        
+        if (data && data.length > 0) {
+          allParts = [...allParts, ...data]
+          page++
+          hasMore = data.length === pageSize
+        } else {
+          hasMore = false
+        }
+      }
       
-      if (error) throw error
-      setParts(data || [])
+      console.log('Fetched parts count:', allParts.length)
+      setParts(allParts)
     } catch (error) {
       console.error('Error fetching parts:', error)
+    } finally {
+      setPartsLoading(false)
     }
   }
 
@@ -148,16 +171,84 @@ export default function Home() {
     setShowDropdown(false)
   }
 
+  async function updateRule(rule, updates) {
+    try {
+      const { error } = await supabase
+        .from('schematic_rule')
+        .update(updates)
+        .eq('uuid', rule.uuid)
+
+      if (error) throw error
+
+      // Update the local rules state
+      setRules(prevRules => 
+        prevRules.map(r => 
+          r.uuid === rule.uuid 
+            ? { ...r, ...updates }
+            : r
+        )
+      )
+    } catch (error) {
+      console.error('Error updating rule:', error)
+      throw error
+    }
+  }
+
   return (
-    <div 
-      ref={containerRef}
-      style={{ 
-        display: 'flex', 
-        height: '100vh', 
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        backgroundColor: '#f8f9fa'
-      }}
-    >
+    <>
+      <style jsx>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+      <div 
+        ref={containerRef}
+        style={{ 
+          display: 'flex', 
+          height: '100vh', 
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          backgroundColor: '#f8f9fa',
+          position: 'relative'
+        }}
+      >
+      {partsLoading && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          fontSize: '16px',
+          color: '#fff'
+        }}>
+          <div style={{
+            backgroundColor: '#fff',
+            padding: '20px 30px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            color: '#495057',
+            display: 'flex',
+            alignItems: 'center'
+          }}>
+            <div style={{
+              width: '20px',
+              height: '20px',
+              border: '2px solid #e9ecef',
+              borderTop: '2px solid #007bff',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+              marginRight: '10px'
+            }}></div>
+            Loading parts...
+          </div>
+        </div>
+      )}
       <div style={{ 
         width: `${leftWidth}%`, 
         padding: '20px', 
@@ -366,11 +457,51 @@ export default function Home() {
             )} */}
             
             {rules.length > 0 && (
-              <RulesList rules={rules} />
+              <RulesList rules={rules} onUpdateRule={updateRule} />
             )}
           </div>
         )}
+        
+        {/* Date filter temporarily disabled - created_at column doesn't exist */}
+        {/* {!selectedPartId && (
+          <div style={{ 
+            position: 'fixed',
+            bottom: '20px',
+            right: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '10px',
+            color: '#6c757d',
+            backgroundColor: '#fff',
+            padding: '6px 10px',
+            borderRadius: '4px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            border: '1px solid #e9ecef'
+          }}>
+            <span>Fetching parts from last:</span>
+            <select 
+              value={dateRange} 
+              onChange={(e) => setDateRange(e.target.value)}
+              style={{ 
+                padding: '2px 4px', 
+                fontSize: '10px',
+                border: '1px solid #dee2e6',
+                borderRadius: '3px',
+                backgroundColor: '#fff'
+              }}
+            >
+              <option value="1">1 day</option>
+              <option value="3">3 days</option>
+              <option value="7">7 days</option>
+              <option value="14">14 days</option>
+              <option value="30">30 days</option>
+              <option value="all">All parts</option>
+            </select>
+          </div>
+        )} */}
       </div>
     </div>
+    </>
   )
 }
