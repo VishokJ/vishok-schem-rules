@@ -2,8 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import PdfViewer from '../components/PdfViewer'
 import RulesList from '../components/RulesList'
+import ReviewsTab from '../components/ReviewsTab'
+import { fonts } from '../lib/styles'
+import { useTheme } from '../lib/ThemeContext'
 
 export default function Home() {
+  const { isDarkMode, toggleDarkMode, colors } = useTheme()
+  const [activeTab, setActiveTab] = useState('datasheet')
   const [partData, setPartData] = useState(null)
   const [rules, setRules] = useState([])
   const [loading, setLoading] = useState(true)
@@ -196,22 +201,116 @@ export default function Home() {
 
   return (
     <>
-      <style jsx>{`
+      <style jsx global>{`
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
       `}</style>
-      <div 
-        ref={containerRef}
-        style={{ 
-          display: 'flex', 
-          height: '100vh', 
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-          backgroundColor: '#f8f9fa',
+      <div style={{ 
+        height: '100vh', 
+        fontFamily: fonts.system,
+        backgroundColor: colors.light,
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        {/* Tab Navigation */}
+        <div style={{
+          display: 'flex',
+          backgroundColor: colors.white,
+          borderBottom: `2px solid ${colors.borderLight}`,
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
           position: 'relative'
-        }}
-      >
+        }}>
+          <button
+            onClick={() => setActiveTab('datasheet')}
+            style={{
+              padding: '16px 24px',
+              border: 'none',
+              backgroundColor: activeTab === 'datasheet' ? colors.primary : 'transparent',
+              color: activeTab === 'datasheet' ? colors.white : colors.text,
+              fontSize: '16px',
+              fontWeight: '500',
+              textTransform: 'none',
+              letterSpacing: '0.25px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              fontFamily: fonts.mono,
+              borderBottom: activeTab === 'datasheet' ? `3px solid ${colors.primaryHover}` : '3px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            📋 rule_editor
+          </button>
+          <button
+            onClick={() => setActiveTab('reviews')}
+            style={{
+              padding: '16px 24px',
+              border: 'none',
+              backgroundColor: activeTab === 'reviews' ? colors.primary : 'transparent',
+              color: activeTab === 'reviews' ? colors.white : colors.text,
+              fontSize: '16px',
+              fontWeight: '500',
+              textTransform: 'none',
+              letterSpacing: '0.25px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              fontFamily: fonts.mono,
+              borderBottom: activeTab === 'reviews' ? `3px solid ${colors.primaryHover}` : '3px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            🔍 review_editor
+          </button>
+          
+          {/* Dark Mode Toggle */}
+          <button
+            onClick={toggleDarkMode}
+            style={{
+              position: 'absolute',
+              right: '20px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              padding: '8px 12px',
+              border: `1px solid ${colors.border}`,
+              backgroundColor: colors.white,
+              color: colors.text,
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontFamily: fonts.mono,
+              transition: 'all 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.backgroundColor = colors.light
+              e.target.style.borderColor = colors.primary
+            }}
+            onMouseOut={(e) => {
+              e.target.style.backgroundColor = colors.white
+              e.target.style.borderColor = colors.border
+            }}
+          >
+            {isDarkMode ? '☀️' : '🌙'} {isDarkMode ? 'light' : 'dark'}
+          </button>
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === 'datasheet' ? (
+          <div 
+            ref={containerRef}
+            style={{ 
+              display: 'flex', 
+              flex: 1,
+              position: 'relative'
+            }}
+          >
       {partsLoading && (
         <div style={{
           position: 'fixed',
@@ -252,18 +351,20 @@ export default function Home() {
       <div style={{ 
         width: `${leftWidth}%`, 
         padding: '20px', 
-        backgroundColor: '#fff',
+        backgroundColor: colors.white,
         boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
         display: 'flex',
         flexDirection: 'column'
       }}>
         <h2 style={{ 
           margin: '0 0 20px 0', 
-          color: '#2c3e50',
-          fontSize: '24px',
-          fontWeight: '600'
+          color: colors.textDark,
+          fontSize: '20px',
+          fontWeight: '500',
+          fontFamily: fonts.mono,
+          letterSpacing: '0.25px'
         }}>
-          Datasheet Viewer{partData ? `: Part ${partData.part_id}` : ''}
+          datasheets{partData ? `: ${partData.part_id}` : ''}
         </h2>
         
         {pdfLoading ? (
@@ -283,10 +384,10 @@ export default function Home() {
           <div style={{ 
             padding: '40px', 
             textAlign: 'center', 
-            border: '2px dashed #ddd',
+            border: `2px dashed ${colors.border}`,
             borderRadius: '8px',
-            backgroundColor: '#f8f9fa',
-            color: '#dc3545',
+            backgroundColor: colors.light,
+            color: colors.danger,
             fontSize: '16px'
           }}>
             ❌ Failed to load datasheet
@@ -295,10 +396,10 @@ export default function Home() {
           <div style={{ 
             padding: '40px', 
             textAlign: 'center', 
-            border: '2px dashed #ddd',
+            border: `2px dashed ${colors.border}`,
             borderRadius: '8px',
-            backgroundColor: '#f8f9fa',
-            color: '#6c757d',
+            backgroundColor: colors.light,
+            color: colors.textMuted,
             fontSize: '16px'
           }}>
             📄 Datasheet file not found!
@@ -307,7 +408,7 @@ export default function Home() {
           <div style={{ 
             padding: '40px', 
             textAlign: 'center', 
-            color: '#6c757d',
+            color: colors.textMuted,
             fontSize: '16px'
           }}>
             Select a part to view datasheet
@@ -338,16 +439,18 @@ export default function Home() {
         width: `${100 - leftWidth}%`, 
         padding: '20px', 
         overflow: 'auto',
-        backgroundColor: '#fff'
+        backgroundColor: colors.white
       }}>
         <div style={{ marginBottom: '24px' }}>
           <h2 style={{ 
             margin: '0 0 20px 0', 
-            color: '#2c3e50',
-            fontSize: '24px',
-            fontWeight: '600'
+            color: colors.textDark,
+            fontSize: '20px',
+            fontWeight: '500',
+            fontFamily: fonts.mono,
+            letterSpacing: '0.25px'
           }}>
-            Part Information
+            parts
           </h2>
           
           <div ref={searchRef} style={{ marginBottom: '16px', position: 'relative' }}>
@@ -359,18 +462,21 @@ export default function Home() {
               style={{
                 width: '100%',
                 padding: '12px 16px',
-                border: '2px solid #e9ecef',
+                border: `2px solid ${colors.borderLight}`,
                 borderRadius: '8px',
                 fontSize: '14px',
                 outline: 'none',
                 transition: 'border-color 0.2s',
-                marginBottom: '12px'
+                marginBottom: '12px',
+                backgroundColor: colors.white,
+                color: colors.text,
+                boxSizing: 'border-box'
               }}
               onFocus={(e) => {
-                e.target.style.borderColor = '#007bff'
+                e.target.style.borderColor = colors.primary
                 if (searchTerm.length >= 2) setShowDropdown(true)
               }}
-              onBlur={(e) => e.target.style.borderColor = '#e9ecef'}
+              onBlur={(e) => e.target.style.borderColor = colors.borderLight}
             />
             
             {showDropdown && filteredParts.length > 0 && (
@@ -379,8 +485,8 @@ export default function Home() {
                 top: '100%',
                 left: 0,
                 right: 0,
-                backgroundColor: '#fff',
-                border: '2px solid #007bff',
+                backgroundColor: colors.white,
+                border: `2px solid ${colors.primary}`,
                 borderRadius: '8px',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                 zIndex: 1000,
@@ -394,11 +500,12 @@ export default function Home() {
                     style={{
                       padding: '12px 16px',
                       cursor: 'pointer',
-                      borderBottom: index < Math.min(filteredParts.length, 10) - 1 ? '1px solid #e9ecef' : 'none',
-                      transition: 'background-color 0.2s'
+                      borderBottom: index < Math.min(filteredParts.length, 10) - 1 ? `1px solid ${colors.borderLight}` : 'none',
+                      transition: 'background-color 0.2s',
+                      color: colors.text
                     }}
-                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
-                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#fff'}
+                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = colors.light}
+                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = colors.white}
                   >
                     {part.part_id}
                   </div>
@@ -424,10 +531,12 @@ export default function Home() {
                 width: '100%', 
                 padding: '12px 16px', 
                 fontSize: '14px',
-                border: '2px solid #e9ecef',
+                border: `2px solid ${colors.borderLight}`,
                 borderRadius: '8px',
-                backgroundColor: '#fff',
-                outline: 'none'
+                backgroundColor: colors.white,
+                color: colors.text,
+                outline: 'none',
+                boxSizing: 'border-box'
               }}
             >
               <option value="">Choose a part...</option>
@@ -444,7 +553,7 @@ export default function Home() {
           <div style={{ 
             textAlign: 'center', 
             padding: '20px',
-            color: '#6c757d'
+            color: colors.textMuted
           }}>
             Loading...
           </div>
@@ -500,8 +609,12 @@ export default function Home() {
             </select>
           </div>
         )} */}
+          </div>
+        </div>
+        ) : (
+          <ReviewsTab />
+        )}
       </div>
-    </div>
     </>
   )
 }

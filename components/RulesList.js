@@ -1,6 +1,9 @@
 import { useState } from 'react'
+import { createEditButton, createSaveButton, createCancelButton } from '../lib/styles'
+import { useTheme } from '../lib/ThemeContext'
 
 export default function RulesList({ rules, onUpdateRule }) {
+  const { colors } = useTheme()
   const [collapsedCategories, setCollapsedCategories] = useState({})
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [editingRules, setEditingRules] = useState({})
@@ -28,22 +31,22 @@ export default function RulesList({ rules, onUpdateRule }) {
   const getLevelColor = (level) => {
     switch (level) {
       case 'ESSENTIAL':
-        return '#fff5f5'
+        return colors.essentialBg
       case 'RECOMMENDED':
-        return '#fffbf0'
+        return colors.recommendedBg
       default:
-        return '#f8f9fa'
+        return colors.light
     }
   }
 
   const getLevelBorder = (level) => {
     switch (level) {
       case 'ESSENTIAL':
-        return '2px solid #dc3545'
+        return `2px solid ${colors.essentialBorder}`
       case 'RECOMMENDED':
-        return '2px solid #ffc107'
+        return `2px solid ${colors.recommendedBorder}`
       default:
-        return '1px solid #dee2e6'
+        return `1px solid ${colors.border}`
     }
   }
 
@@ -111,29 +114,29 @@ export default function RulesList({ rules, onUpdateRule }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '12px 16px',
-          backgroundColor: '#e3f2fd',
-          border: '2px solid #90caf9',
+          padding: '16px',
+          backgroundColor: colors.white,
+          border: `1px solid ${colors.border}`,
           borderRadius: '8px',
           cursor: 'pointer',
           marginBottom: isCollapsed ? '0' : '16px',
           transition: 'all 0.2s',
           userSelect: 'none'
         }}
-        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#bbdefb'}
-        onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#e3f2fd'}
+        onMouseOver={(e) => e.currentTarget.style.backgroundColor = colors.light}
+        onMouseOut={(e) => e.currentTarget.style.backgroundColor = colors.white}
       >
         <h3 style={{ 
           margin: '0',
-          color: '#1565c0',
-          fontSize: '18px',
+          color: colors.text,
+          fontSize: '16px',
           fontWeight: '600'
         }}>
           📋 Rules
         </h3>
         <span style={{ 
-          fontSize: '20px',
-          color: '#1565c0',
+          fontSize: '16px',
+          color: colors.textMuted,
           transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)',
           transition: 'transform 0.2s'
         }}>
@@ -155,22 +158,23 @@ export default function RulesList({ rules, onUpdateRule }) {
                 justifyContent: 'space-between',
                 margin: '0 0 12px 0',
                 padding: '12px 16px',
-                backgroundColor: '#e3f2fd',
-                border: '2px solid #90caf9',
+                backgroundColor: colors.white,
+                border: `1px solid ${colors.border}`,
                 borderRadius: '8px',
-                fontSize: '16px',
+                fontSize: '14px',
                 fontWeight: '600',
-                color: '#1565c0',
+                color: colors.text,
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 userSelect: 'none'
               }}
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#bbdefb'}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#e3f2fd'}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = colors.light}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = colors.white}
             >
               <span>📂 {category}</span>
               <span style={{ 
-                fontSize: '16px',
+                fontSize: '14px',
+                color: colors.textMuted,
                 transform: isCategoryCollapsed ? 'rotate(0deg)' : 'rotate(90deg)',
                 transition: 'transform 0.2s'
               }}>
@@ -224,13 +228,13 @@ export default function RulesList({ rules, onUpdateRule }) {
                             style={{
                               fontSize: '12px',
                               fontWeight: '700',
-                              color: currentLevel === 'ESSENTIAL' ? '#dc3545' : '#ffc107',
+                              color: currentLevel === 'ESSENTIAL' ? colors.essentialBorder : colors.recommendedBorder,
                               textTransform: 'uppercase',
                               letterSpacing: '0.5px',
                               padding: '4px 8px',
-                              backgroundColor: currentLevel === 'ESSENTIAL' ? '#f8d7da' : '#fff3cd',
+                              backgroundColor: currentLevel === 'ESSENTIAL' ? colors.essentialBg : colors.recommendedBg,
                               borderRadius: '4px',
-                              border: `1px solid ${currentLevel === 'ESSENTIAL' ? '#f5c6cb' : '#ffeaa7'}`,
+                              border: `1px solid ${currentLevel === 'ESSENTIAL' ? colors.essentialBorder : colors.recommendedBorder}`,
                               cursor: 'pointer',
                               transition: 'all 0.2s'
                             }}
@@ -246,26 +250,18 @@ export default function RulesList({ rules, onUpdateRule }) {
                             <span
                               onClick={() => startEditing(rule, index)}
                               style={{
-                                fontSize: '10px',
-                                fontWeight: '600',
-                                color: '#6c757d',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px',
-                                padding: '3px 6px',
-                                backgroundColor: '#f8f9fa',
-                                borderRadius: '3px',
-                                border: '1px solid #dee2e6',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                userSelect: 'none'
+                                ...createEditButton(),
+                                backgroundColor: colors.light,
+                                color: colors.textMuted,
+                                border: `1px solid ${colors.border}`
                               }}
                               onMouseOver={(e) => {
-                                e.target.style.backgroundColor = '#e9ecef'
-                                e.target.style.color = '#495057'
+                                e.target.style.backgroundColor = colors.borderLight
+                                e.target.style.color = colors.text
                               }}
                               onMouseOut={(e) => {
-                                e.target.style.backgroundColor = '#f8f9fa'
-                                e.target.style.color = '#6c757d'
+                                e.target.style.backgroundColor = colors.light
+                                e.target.style.color = colors.textMuted
                               }}
                             >
                               ✏️ Edit
@@ -274,26 +270,18 @@ export default function RulesList({ rules, onUpdateRule }) {
                             <span
                               onClick={() => cancelEditing(rule, index)}
                               style={{
-                                fontSize: '10px',
-                                fontWeight: '600',
-                                color: '#6c757d',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px',
-                                padding: '3px 6px',
-                                backgroundColor: '#f8f9fa',
-                                borderRadius: '3px',
-                                border: '1px solid #dee2e6',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                userSelect: 'none'
+                                ...createCancelButton(),
+                                backgroundColor: colors.light,
+                                color: colors.textMuted,
+                                border: `1px solid ${colors.border}`
                               }}
                               onMouseOver={(e) => {
-                                e.target.style.backgroundColor = '#e9ecef'
-                                e.target.style.color = '#495057'
+                                e.target.style.backgroundColor = colors.borderLight
+                                e.target.style.color = colors.text
                               }}
                               onMouseOut={(e) => {
-                                e.target.style.backgroundColor = '#f8f9fa'
-                                e.target.style.color = '#6c757d'
+                                e.target.style.backgroundColor = colors.light
+                                e.target.style.color = colors.textMuted
                               }}
                             >
                               ❌ Cancel
@@ -304,18 +292,10 @@ export default function RulesList({ rules, onUpdateRule }) {
                             <span
                               onClick={() => saveRule(rule, index)}
                               style={{
-                                fontSize: '10px',
-                                fontWeight: '600',
-                                color: '#155724',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px',
-                                padding: '3px 6px',
+                                ...createSaveButton(),
                                 backgroundColor: '#d4edda',
-                                borderRadius: '3px',
-                                border: '1px solid #c3e6cb',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                userSelect: 'none'
+                                color: '#155724',
+                                border: '1px solid #c3e6cb'
                               }}
                               onMouseOver={(e) => {
                                 e.target.style.backgroundColor = '#c3e6cb'
@@ -342,10 +322,13 @@ export default function RulesList({ rules, onUpdateRule }) {
                             fontSize: '14px',
                             lineHeight: '1.6',
                             padding: '8px',
-                            border: '2px solid #007bff',
+                            border: `2px solid ${colors.primary}`,
                             borderRadius: '4px',
                             resize: 'vertical',
-                            outline: 'none'
+                            outline: 'none',
+                            backgroundColor: colors.white,
+                            color: colors.text,
+                            boxSizing: 'border-box'
                           }}
                         />
                       ) : (
@@ -353,7 +336,10 @@ export default function RulesList({ rules, onUpdateRule }) {
                           fontSize: '14px',
                           lineHeight: '1.6',
                           whiteSpace: 'pre-wrap',
-                          color: '#495057'
+                          color: colors.text,
+                          padding: '8px',
+                          backgroundColor: colors.light,
+                          borderRadius: '4px'
                         }}>
                           {currentContent}
                         </div>
