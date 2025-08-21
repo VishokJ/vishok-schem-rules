@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import PdfViewer from '../components/PdfViewer'
 import RulesList from '../components/RulesList'
 import ReviewsTab from '../components/ReviewsTab'
+import UploadTab from '../components/UploadTab'
 import { fonts } from '../lib/styles'
 import { useTheme } from '../lib/ThemeContext'
 
@@ -199,6 +200,54 @@ export default function Home() {
     }
   }
 
+  async function addRule(ruleData) {
+    try {
+      const response = await fetch('/api/add-rule', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(ruleData)
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to add rule')
+      }
+
+      // Add the new rule to local state
+      setRules(prevRules => [...prevRules, data.rule])
+    } catch (error) {
+      console.error('Error adding rule:', error)
+      throw error
+    }
+  }
+
+  async function deleteRule(ruleId) {
+    try {
+      const response = await fetch('/api/delete-rule', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ ruleId })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete rule')
+      }
+
+      // Remove the rule from local state
+      setRules(prevRules => prevRules.filter(r => r.uuid !== ruleId))
+    } catch (error) {
+      console.error('Error deleting rule:', error)
+      throw error
+    }
+  }
+
   return (
     <>
       <style jsx global>{`
@@ -265,6 +314,28 @@ export default function Home() {
             }}
           >
             🔍 review_editor
+          </button>
+          <button
+            onClick={() => setActiveTab('upload')}
+            style={{
+              padding: '16px 24px',
+              border: 'none',
+              backgroundColor: activeTab === 'upload' ? colors.primary : 'transparent',
+              color: activeTab === 'upload' ? colors.white : colors.text,
+              fontSize: '16px',
+              fontWeight: '500',
+              textTransform: 'none',
+              letterSpacing: '0.25px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              fontFamily: fonts.mono,
+              borderBottom: activeTab === 'upload' ? `3px solid ${colors.primaryHover}` : '3px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            📤 upload
           </button>
           
           {/* Dark Mode Toggle */}
@@ -566,7 +637,13 @@ export default function Home() {
             )} */}
             
             {rules.length > 0 && (
-              <RulesList rules={rules} onUpdateRule={updateRule} />
+              <RulesList 
+                rules={rules} 
+                onUpdateRule={updateRule} 
+                onAddRule={addRule}
+                onDeleteRule={deleteRule}
+                partId={selectedPartId}
+              />
             )}
           </div>
         )}
@@ -611,8 +688,10 @@ export default function Home() {
         )} */}
           </div>
         </div>
-        ) : (
+        ) : activeTab === 'reviews' ? (
           <ReviewsTab />
+        ) : (
+          <UploadTab />
         )}
       </div>
     </>

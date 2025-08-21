@@ -2,13 +2,16 @@ import { useState } from 'react'
 import { createEditButton, createSaveButton, createCancelButton } from '../lib/styles'
 import { useTheme } from '../lib/ThemeContext'
 
-export default function RulesList({ rules, onUpdateRule }) {
+export default function RulesList({ rules, onUpdateRule, onAddRule, onDeleteRule, partId }) {
   const { colors } = useTheme()
   const [collapsedCategories, setCollapsedCategories] = useState({})
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [editingRules, setEditingRules] = useState({})
   const [editedContent, setEditedContent] = useState({})
   const [editedLevels, setEditedLevels] = useState({})
+  const [showAddForm, setShowAddForm] = useState({})
+  const [newRuleContent, setNewRuleContent] = useState({})
+  const [newRuleLevel, setNewRuleLevel] = useState({})
 
   if (!rules || rules.length === 0) return null
 
@@ -106,6 +109,58 @@ export default function RulesList({ rules, onUpdateRule }) {
     return contentChanged || levelChanged
   }
 
+  const showAddRuleForm = (category) => {
+    setShowAddForm(prev => ({ ...prev, [category]: true }))
+    setNewRuleContent(prev => ({ ...prev, [category]: '' }))
+    setNewRuleLevel(prev => ({ ...prev, [category]: 'RECOMMENDED' }))
+  }
+
+  const hideAddRuleForm = (category) => {
+    setShowAddForm(prev => ({ ...prev, [category]: false }))
+    setNewRuleContent(prev => ({ ...prev, [category]: '' }))
+    setNewRuleLevel(prev => ({ ...prev, [category]: 'RECOMMENDED' }))
+  }
+
+  const addNewRule = async (category) => {
+    const content = newRuleContent[category]?.trim()
+    const level = newRuleLevel[category]
+    
+    if (!content || !partId) {
+      alert('Rule content is required')
+      return
+    }
+
+    if (onAddRule) {
+      try {
+        await onAddRule({
+          partId,
+          content,
+          category,
+          level
+        })
+        hideAddRuleForm(category)
+      } catch (error) {
+        console.error('Failed to add rule:', error)
+        alert('Failed to add rule. Please try again.')
+      }
+    }
+  }
+
+  const deleteRule = async (rule) => {
+    if (!window.confirm('Are you sure you want to delete this rule?')) {
+      return
+    }
+
+    if (onDeleteRule) {
+      try {
+        await onDeleteRule(rule.uuid)
+      } catch (error) {
+        console.error('Failed to delete rule:', error)
+        alert('Failed to delete rule. Please try again.')
+      }
+    }
+  }
+
   return (
     <div style={{ marginBottom: '32px' }}>
       <div 
@@ -185,8 +240,43 @@ export default function RulesList({ rules, onUpdateRule }) {
             {!isCategoryCollapsed && (
               <div style={{ 
                 paddingLeft: '8px',
-                animation: 'fadeIn 0.3s ease-in'
+                paddingRight: '0px',
+                animation: 'fadeIn 0.3s ease-in',
+                overflow: 'hidden'
               }}>
+                {/* ADD RULES button */}
+                <div
+                  onClick={() => showAddRuleForm(category)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 16px',
+                    marginBottom: '12px',
+                    backgroundColor: colors.primary,
+                    color: colors.white,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    textAlign: 'center',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    userSelect: 'none',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    boxSizing: 'border-box'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.backgroundColor = colors.primaryHover
+                    e.currentTarget.style.transform = 'translateY(-1px)'
+                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)'
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.backgroundColor = colors.primary
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
+                  }}
+                >
+                  + ADD RULES
+                </div>
                 {categoryRules.map((rule, index) => {
                   const key = getRuleKey(rule, index)
                   const isEditing = editingRules[key]
@@ -309,6 +399,28 @@ export default function RulesList({ rules, onUpdateRule }) {
                               💾 Save
                             </span>
                           )}
+                          
+                          {!isEditing && (
+                            <span
+                              onClick={() => deleteRule(rule)}
+                              style={{
+                                ...createEditButton(),
+                                backgroundColor: colors.statusFailBg,
+                                color: colors.statusFail,
+                                border: `1px solid ${colors.danger}`
+                              }}
+                              onMouseOver={(e) => {
+                                e.target.style.backgroundColor = colors.danger
+                                e.target.style.color = colors.white
+                              }}
+                              onMouseOut={(e) => {
+                                e.target.style.backgroundColor = colors.statusFailBg
+                                e.target.style.color = colors.statusFail
+                              }}
+                            >
+                              🗑️ Delete
+                            </span>
+                          )}
                         </div>
                       </div>
                       
@@ -347,6 +459,123 @@ export default function RulesList({ rules, onUpdateRule }) {
                     </div>
                   )
                 })}
+                
+                {/* Add Rule Form */}
+                {showAddForm[category] && (
+                  <div style={{
+                    marginBottom: '12px',
+                    padding: '16px',
+                    backgroundColor: colors.white,
+                    border: `2px dashed ${colors.primary}`,
+                    borderRadius: '8px',
+                    boxSizing: 'border-box'
+                  }}>
+                    <div style={{ marginBottom: '12px' }}>
+                      <label style={{
+                        display: 'block',
+                        marginBottom: '8px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        color: colors.text
+                      }}>
+                        Rule Content:
+                      </label>
+                      <textarea
+                        value={newRuleContent[category] || ''}
+                        onChange={(e) => setNewRuleContent(prev => ({ ...prev, [category]: e.target.value }))}
+                        placeholder="Enter rule content..."
+                        style={{
+                          width: '100%',
+                          minHeight: '80px',
+                          fontSize: '14px',
+                          lineHeight: '1.6',
+                          padding: '8px',
+                          border: `2px solid ${colors.borderLight}`,
+                          borderRadius: '4px',
+                          resize: 'vertical',
+                          outline: 'none',
+                          backgroundColor: colors.white,
+                          color: colors.text,
+                          boxSizing: 'border-box'
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = colors.primary}
+                        onBlur={(e) => e.target.style.borderColor = colors.borderLight}
+                      />
+                    </div>
+                    
+                    <div style={{ marginBottom: '12px' }}>
+                      <label style={{
+                        display: 'block',
+                        marginBottom: '8px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        color: colors.text
+                      }}>
+                        Priority Level:
+                      </label>
+                      <select
+                        value={newRuleLevel[category] || 'RECOMMENDED'}
+                        onChange={(e) => setNewRuleLevel(prev => ({ ...prev, [category]: e.target.value }))}
+                        style={{
+                          padding: '8px 12px',
+                          fontSize: '14px',
+                          border: `2px solid ${colors.borderLight}`,
+                          borderRadius: '4px',
+                          outline: 'none',
+                          backgroundColor: colors.white,
+                          color: colors.text,
+                          boxSizing: 'border-box'
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = colors.primary}
+                        onBlur={(e) => e.target.style.borderColor = colors.borderLight}
+                      >
+                        <option value="RECOMMENDED">RECOMMENDED</option>
+                        <option value="ESSENTIAL">ESSENTIAL</option>
+                      </select>
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <span
+                        onClick={() => addNewRule(category)}
+                        style={{
+                          ...createSaveButton(),
+                          backgroundColor: colors.statusPassBg,
+                          color: colors.statusPass,
+                          border: `1px solid ${colors.success}`
+                        }}
+                        onMouseOver={(e) => {
+                          e.target.style.backgroundColor = colors.success
+                          e.target.style.color = colors.white
+                        }}
+                        onMouseOut={(e) => {
+                          e.target.style.backgroundColor = colors.statusPassBg
+                          e.target.style.color = colors.statusPass
+                        }}
+                      >
+                        ➕ Add Rule
+                      </span>
+                      <span
+                        onClick={() => hideAddRuleForm(category)}
+                        style={{
+                          ...createCancelButton(),
+                          backgroundColor: colors.light,
+                          color: colors.textMuted,
+                          border: `1px solid ${colors.border}`
+                        }}
+                        onMouseOver={(e) => {
+                          e.target.style.backgroundColor = colors.borderLight
+                          e.target.style.color = colors.text
+                        }}
+                        onMouseOut={(e) => {
+                          e.target.style.backgroundColor = colors.light
+                          e.target.style.color = colors.textMuted
+                        }}
+                      >
+                        ❌ Cancel
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
