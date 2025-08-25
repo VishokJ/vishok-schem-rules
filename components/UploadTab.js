@@ -121,31 +121,51 @@ export default function UploadTab() {
           formData.append('forceRefresh', forceRefresh)
           
           addLog(`🔗 Sending to processing API...`, 'info')
-          const response = await fetch('/api/process-datasheet', {
-            method: 'POST',
-            body: formData
-          })
           
-          const result = await response.json()
+          // Set up a timeout warning for long-running processes
+          const warningTimeout = setTimeout(() => {
+            addLog(`⏱️ Processing is taking longer than expected. Large or complex PDFs may take several minutes to process.`, 'warning')
+          }, 30000) // 30 seconds
           
-          // Debug: Log the full result to see what's being returned
-          console.log('API Response:', result)
+          const slowWarningTimeout = setTimeout(() => {
+            addLog(`⏳ Still processing... This file may be very complex. Maximum processing time is 10 minutes.`, 'warning')
+          }, 120000) // 2 minutes
+          
+          try {
+            const response = await fetch('/api/process-datasheet', {
+              method: 'POST',
+              body: formData
+            })
+            
+            // Clear the timeout warnings
+            clearTimeout(warningTimeout)
+            clearTimeout(slowWarningTimeout)
+            
+            const result = await response.json()
+          
+            // Debug: Log the full result to see what's being returned
+            console.log('API Response:', result)
           
           // Add backend logs if available
-          if (result.backendLogs) {
-            addLog(`🔧 Backend logs found (${result.backendLogs.length} chars)`, 'info')
+          if (result.backendLogs && result.backendLogs.trim()) {
+            addLog(`🔧 Backend processing logs:`, 'info')
             const backendLogLines = result.backendLogs.split('\n').filter(line => line.trim())
             backendLogLines.forEach(line => {
-              if (line.includes('Error') || line.includes('Failed')) {
-                addLog(`🔧 ${line}`, 'error')
-              } else if (line.includes('Debug:')) {
-                addLog(`🔧 ${line}`, 'info')
-              } else if (line.trim()) {
-                addLog(`🔧 ${line}`, 'info')
+              const cleanLine = line.trim()
+              if (cleanLine.includes('Error') || cleanLine.includes('Failed') || cleanLine.includes('Exception')) {
+                addLog(`❗ ${cleanLine}`, 'error')
+              } else if (cleanLine.includes('Debug:')) {
+                addLog(`🔍 ${cleanLine.replace('Debug: ', '')}`, 'info')
+              } else if (cleanLine.includes('Successfully') || cleanLine.includes('Completed')) {
+                addLog(`✅ ${cleanLine}`, 'success')
+              } else if (cleanLine.includes('Processing') || cleanLine.includes('Loading') || cleanLine.includes('Saving')) {
+                addLog(`⚙️ ${cleanLine}`, 'info')
+              } else if (cleanLine) {
+                addLog(`📋 ${cleanLine}`, 'info')
               }
             })
           } else {
-            addLog(`🔧 No backend logs found in response`, 'warning')
+            addLog(`⚠️ No backend logs available - check server console for details`, 'warning')
           }
           
           if (result.success) {
@@ -155,6 +175,14 @@ export default function UploadTab() {
           }
           
           results.push({ file: file.name, ...result })
+          } catch (fetchError) {
+            // Clear the timeout warnings
+            clearTimeout(warningTimeout)
+            clearTimeout(slowWarningTimeout)
+            
+            addLog(`❌ Network error processing ${file.name}: ${fetchError.message}`, 'error')
+            results.push({ file: file.name, success: false, error: `Network error: ${fetchError.message}` })
+          }
         }
         
         // Show results

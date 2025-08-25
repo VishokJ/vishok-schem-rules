@@ -161,19 +161,22 @@ async function processDatasheetWithPython(s3Key, partId, organization) {
 
       let stdout = ''
       let stderr = ''
+      let allLogs = []
 
       pythonProcess.stdout.on('data', (data) => {
-        stdout += data.toString()
+        const output = data.toString()
+        stdout += output
+        console.log(`Python stdout: ${output}`)
       })
 
       pythonProcess.stderr.on('data', (data) => {
-        stderr += data.toString()
+        const output = data.toString()
+        stderr += output
+        allLogs.push(output)
+        console.log(`Python stderr: ${output}`)
       })
 
       pythonProcess.on('close', (code) => {
-        // Clear the timeout
-        clearTimeout(timeoutId)
-        
         // Clean up temp file
         try {
           fs.unlinkSync(tempFile)
@@ -182,47 +185,60 @@ async function processDatasheetWithPython(s3Key, partId, organization) {
         }
 
         console.log(`Python process exited with code: ${code}`)
-        console.log(`Python stdout: ${stdout}`)
-        console.log(`Python stderr: ${stderr}`)
+        console.log(`Python complete stderr: ${stderr}`)
 
         if (code === 0 || code === null) {
           try {
             // Try to parse JSON from stdout
-            if (stdout.trim()) {
-              const result = JSON.parse(stdout)
-              // Add backend logs to the result
-              result.backendLogs = stderr
+            const jsonLines = stdout.split('\n').filter(line => {
+              const trimmed = line.trim()
+              return trimmed.startsWith('{') && trimmed.endsWith('}')
+            })
+            
+            if (jsonLines.length > 0) {
+              // Take the last valid JSON line (final result)
+              const result = JSON.parse(jsonLines[jsonLines.length - 1])
+              // Add comprehensive backend logs to the result
+              result.backendLogs = allLogs.join('')
               resolve(result)
             } else {
-              // No stdout but process completed - check stderr for results
-              resolve({ success: false, error: 'No output from processing script', backendLogs: stderr })
+              // No valid JSON found
+              resolve({ 
+                success: false, 
+                error: `No valid JSON output found. Raw output: ${stdout}`, 
+                backendLogs: allLogs.join('') 
+              })
             }
           } catch (e) {
             console.error('Failed to parse Python output:', stdout)
-            resolve({ success: false, error: `Invalid JSON response: ${stdout}`, backendLogs: stderr })
+            resolve({ 
+              success: false, 
+              error: `Invalid JSON response: ${e.message}. Raw output: ${stdout}`, 
+              backendLogs: allLogs.join('') 
+            })
           }
         } else {
           console.error(`Python process failed with code ${code}:`, stderr)
-          resolve({ success: false, error: `Processing failed (code ${code}): ${stderr || 'No error details'}`, backendLogs: stderr })
+          resolve({ 
+            success: false, 
+            error: `Processing failed (exit code ${code}). Check backend logs for details.`, 
+            backendLogs: allLogs.join('') 
+          })
         }
       })
 
       pythonProcess.on('error', (error) => {
-        // Clear the timeout
-        clearTimeout(timeoutId)
         console.error('Error spawning Python process:', error)
-        resolve({ success: false, error: 'Failed to start processing script', backendLogs: stderr })
+        resolve({ 
+          success: false, 
+          error: `Failed to start processing script: ${error.message}`, 
+          backendLogs: allLogs.join('') 
+        })
       })
-
-      // Set a timeout (increased for complex PDFs)
-      const timeoutId = setTimeout(() => {
-        pythonProcess.kill()
-        resolve({ success: false, error: 'Processing timed out after 30 minutes', backendLogs: stderr })
-      }, 1800000) // 30 minute timeout
 
     } catch (error) {
       console.error('Error in processDatasheetWithPython:', error)
-      resolve({ success: false, error: error.message })
+      resolve({ success: false, error: error.message, backendLogs: '' })
     }
   })
 }

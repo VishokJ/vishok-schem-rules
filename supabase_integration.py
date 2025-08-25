@@ -15,6 +15,22 @@ script_dir = Path(__file__).parent
 env_path = script_dir / '.env'
 load_dotenv(env_path)
 
+def clean_text_for_db(text: str) -> str:
+    """Clean text by removing null bytes and other problematic Unicode characters"""
+    if not isinstance(text, str):
+        return str(text)
+    
+    # Remove null bytes and other control characters that PostgreSQL doesn't like
+    cleaned = text.replace('\x00', '').replace('\u0000', '')
+    
+    # Remove problematic control characters but preserve normal Unicode and whitespace
+    # Keep characters >= 32 (printable ASCII) and common whitespace (\t, \n, \r)
+    # Also keep Unicode characters > 127 (valid Unicode symbols like Ω)
+    cleaned = ''.join(char for char in cleaned 
+                     if ord(char) >= 32 or char in '\t\n\r' or ord(char) > 127)
+    
+    return cleaned
+
 class SupabaseIntegration:
     def __init__(self):
         # Read and normalize credentials from environment (same pattern as test_supabase.py)
@@ -52,8 +68,8 @@ class SupabaseIntegration:
             checklist_uuid = str(uuid.uuid4())
             checklist_data = {
                 'uuid': checklist_uuid,
-                'name': part_name,
-                'part_id': part_id,
+                'name': clean_text_for_db(part_name),
+                'part_id': clean_text_for_db(part_id),
                 'is_generated': True,
                 'is_deleted': False,
                 'is_public': True,
@@ -81,10 +97,10 @@ class SupabaseIntegration:
                 rule_uuid = str(uuid.uuid4())
                 rule_data = {
                     'uuid': rule_uuid,
-                    'content': rule.get('rule', ''),
+                    'content': clean_text_for_db(rule.get('rule', '')),
                     'is_deleted': False,
                     'checklist_id': checklist_id,
-                    'category': rule.get('category', 'Uncategorized'),
+                    'category': clean_text_for_db(rule.get('category', 'Uncategorized')),
                     'level': 'ESSENTIAL' if rule.get('essential', False) else 'RECOMMENDED',
                     'pins': rule.get('pins', []),
                     'created_at': datetime.now().isoformat(),
@@ -108,18 +124,19 @@ class SupabaseIntegration:
         """Create or update a part in the schematic_part table"""
         try:
             part_data = {
-                'part_id': part_id,
-                'part_datasheet_url': datasheet_url,
+                'part_id': clean_text_for_db(part_id),
+                'part_datasheet_url': clean_text_for_db(datasheet_url),
                 'pin_table': pin_table,
                 'updated_at': datetime.now().isoformat()
             }
             
             # Check if part already exists
-            existing = self.supabase.table('schematic_part').select('part_id').eq('part_id', part_id).execute()
+            cleaned_part_id = clean_text_for_db(part_id)
+            existing = self.supabase.table('schematic_part').select('part_id').eq('part_id', cleaned_part_id).execute()
             
             if existing.data and len(existing.data) > 0:
                 # Update existing part
-                result = self.supabase.table('schematic_part').update(part_data).eq('part_id', part_id).execute()
+                result = self.supabase.table('schematic_part').update(part_data).eq('part_id', cleaned_part_id).execute()
             else:
                 # Create new part
                 part_data['created_at'] = datetime.now().isoformat()
@@ -131,6 +148,20 @@ class SupabaseIntegration:
             print(f"Error creating/updating part: {e}")
             raise
     
+    def check_existing_checklist(self, part_id: str) -> str:
+        """Check if a checklist already exists for this part_id"""
+        try:
+            cleaned_part_id = clean_text_for_db(part_id)
+            result = self.supabase.table('schematic_checklist').select('uuid').eq('part_id', cleaned_part_id).execute()
+            
+            if result.data and len(result.data) > 0:
+                return result.data[0]['uuid']  # Return existing checklist ID
+            return None
+            
+        except Exception as e:
+            print(f"Error checking existing checklist: {e}")
+            return None
+
     def process_datasheet_rules(self, part_name: str, rules_data: Dict[str, Any], s3_key: str) -> Dict[str, Any]:
         """Process complete datasheet rules and save to database"""
         try:
@@ -138,6 +169,17 @@ class SupabaseIntegration:
             device_info = next(iter(rules_data.values())) if rules_data else {}
             rules = device_info.get('checklist', [])
             pin_table = device_info.get('pin', [])
+            
+            # Check if checklist already exists for this part
+            existing_checklist_id = self.check_existing_checklist(part_name)
+            if existing_checklist_id:
+                return {
+                    'success': True,
+                    'skipped': True,
+                    'part_name': part_name,
+                    'checklist_id': existing_checklist_id,
+                    'reason': 'Checklist already exists for this part'
+                }
             
             # Create part entry (use S3 key as datasheet URL)
             part_created = self.create_part(part_name, s3_key, pin_table)

@@ -4,12 +4,14 @@ import PdfViewer from '../components/PdfViewer'
 import RulesList from '../components/RulesList'
 import ReviewsTab from '../components/ReviewsTab'
 import UploadTab from '../components/UploadTab'
+import PinTableEditor from '../components/PinTableEditor'
 import { fonts } from '../lib/styles'
 import { useTheme } from '../lib/ThemeContext'
+import { ADMIN_IPS, normalizeIp } from '../lib/admin'
 
-export default function Home() {
+export default function Home({ isAdmin = false }) {
   const { isDarkMode, toggleDarkMode, colors } = useTheme()
-  const [activeTab, setActiveTab] = useState('datasheet')
+  const [activeTab, setActiveTab] = useState(isAdmin ? 'datasheet' : 'pintable')
   const [partData, setPartData] = useState(null)
   const [rules, setRules] = useState([])
   const [loading, setLoading] = useState(true)
@@ -271,6 +273,7 @@ export default function Home() {
           boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
           position: 'relative'
         }}>
+          {isAdmin && (
           <button
             onClick={() => setActiveTab('datasheet')}
             style={{
@@ -293,6 +296,8 @@ export default function Home() {
           >
             📋 rule_editor
           </button>
+          )}
+          {isAdmin && (
           <button
             onClick={() => setActiveTab('reviews')}
             style={{
@@ -315,6 +320,8 @@ export default function Home() {
           >
             🔍 review_editor
           </button>
+          )}
+          {isAdmin && (
           <button
             onClick={() => setActiveTab('upload')}
             style={{
@@ -336,6 +343,29 @@ export default function Home() {
             }}
           >
             📤 upload
+          </button>
+          )}
+          <button
+            onClick={() => setActiveTab('pintable')}
+            style={{
+              padding: '16px 24px',
+              border: 'none',
+              backgroundColor: activeTab === 'pintable' ? colors.primary : 'transparent',
+              color: activeTab === 'pintable' ? colors.white : colors.text,
+              fontSize: '16px',
+              fontWeight: '500',
+              textTransform: 'none',
+              letterSpacing: '0.25px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              fontFamily: fonts.mono,
+              borderBottom: activeTab === 'pintable' ? `3px solid ${colors.primaryHover}` : '3px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            📌 pin_table_editor
           </button>
           
           {/* Dark Mode Toggle */}
@@ -373,7 +403,7 @@ export default function Home() {
         </div>
 
         {/* Tab Content */}
-        {activeTab === 'datasheet' ? (
+        {isAdmin && activeTab === 'datasheet' ? (
           <div 
             ref={containerRef}
             style={{ 
@@ -688,12 +718,24 @@ export default function Home() {
         )} */}
           </div>
         </div>
-        ) : activeTab === 'reviews' ? (
+        ) : isAdmin && activeTab === 'reviews' ? (
           <ReviewsTab />
-        ) : (
+        ) : isAdmin && activeTab === 'upload' ? (
           <UploadTab />
+        ) : activeTab === 'pintable' ? (
+          <PinTableEditor />
+        ) : (
+          <PinTableEditor />
         )}
       </div>
     </>
   )
+}
+
+export async function getServerSideProps({ req }) {
+  const xff = req.headers['x-forwarded-for']
+  const rawIp = Array.isArray(xff) ? xff[0] : (xff || req.socket?.remoteAddress || '')
+  const clientIp = normalizeIp((rawIp || '').split(',')[0].trim())
+  const isAdmin = ADMIN_IPS.includes(clientIp)
+  return { props: { isAdmin } }
 }
