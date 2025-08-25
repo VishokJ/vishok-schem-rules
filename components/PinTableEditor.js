@@ -291,13 +291,41 @@ export default function PinTableEditor() {
     setHasChanges(true)
   }
 
-  function deletePinTable() {
+  async function deletePinTable() {
+    if (!selectedPart) return
     if (!confirm('Are you sure you want to delete the entire pin table? This cannot be undone.')) {
       return
     }
-    const newTable = { pins: [], footnote: '' }
-    setPinTableData(newTable)
-    setHasChanges(true)
+    try {
+      setSaving(true)
+      const { error } = await supabase
+        .from('schematic_part')
+        .update({ 
+          pin_table: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('part_id', selectedPart.part_id)
+
+      if (error) throw error
+
+      // Reflect deletion locally
+      setPinTableData({ pins: [], footnote: '' })
+      setHasChanges(false)
+      setSelectedRows(new Set())
+      setParts(prevParts => 
+        prevParts.map(p => 
+          p.part_id === selectedPart.part_id 
+            ? { ...p, pin_table: null, updated_at: new Date().toISOString() }
+            : p
+        )
+      )
+      setSelectedPart(prev => prev ? { ...prev, pin_table: null, updated_at: new Date().toISOString() } : prev)
+    } catch (error) {
+      console.error('Error deleting pin table:', error)
+      alert('Failed to delete pin table. Please try again.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   function updateFootnote(footnote) {
