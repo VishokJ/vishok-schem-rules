@@ -7,7 +7,7 @@ import UploadTab from '../components/UploadTab'
 import PinTableEditor from '../components/PinTableEditor'
 import { fonts } from '../lib/styles'
 import { useTheme } from '../lib/ThemeContext'
-import { ADMIN_IPS, normalizeIp } from '../lib/admin'
+// Admin gating removed: rule editor is now visible to all users
 
 export default function Home({ isAdmin = false }) {
   const { isDarkMode, toggleDarkMode, colors } = useTheme()
@@ -24,6 +24,9 @@ export default function Home({ isAdmin = false }) {
   const [pdfUrl, setPdfUrl] = useState(null)
   const [pdfLoading, setPdfLoading] = useState(false)
   const [partsLoading, setPartsLoading] = useState(false)
+  const [checklistId, setChecklistId] = useState(null)
+  const [isPublic, setIsPublic] = useState(null)
+  const [updatingVisibility, setUpdatingVisibility] = useState(false)
   const containerRef = useRef()
   const searchRef = useRef()
 
@@ -119,7 +122,7 @@ export default function Home({ isAdmin = false }) {
 
       const { data: checklistData, error: checklistError } = await supabase
         .from('schematic_checklist')
-        .select('uuid')
+        .select('uuid,is_public')
         .eq('part_id', partId)
         .single()
 
@@ -133,6 +136,8 @@ export default function Home({ isAdmin = false }) {
       if (rulesError) throw rulesError
 
       setPartData(partData)
+      setChecklistId(checklistData.uuid)
+      setIsPublic(Boolean(checklistData.is_public))
       setRules(rulesData || [])
 
       if (partData.file_path) {
@@ -142,6 +147,26 @@ export default function Home({ isAdmin = false }) {
       console.error('Error fetching data:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function updateChecklistVisibility(nextPublic) {
+    try {
+      if (!checklistId) return
+      setUpdatingVisibility(true)
+      const { error } = await supabase
+        .from('schematic_checklist')
+        .update({ is_public: nextPublic })
+        .eq('uuid', checklistId)
+
+      if (error) throw error
+
+      setIsPublic(nextPublic)
+    } catch (error) {
+      console.error('Error updating checklist visibility:', error)
+      alert('Failed to update visibility. Please try again.')
+    } finally {
+      setUpdatingVisibility(false)
     }
   }
 
@@ -665,6 +690,37 @@ export default function Home({ isAdmin = false }) {
             {/* {partData.pin_table && (
               <PinTable pinData={partData.pin_table} />
             )} */}
+            {isAdmin && checklistId && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                marginBottom: '12px',
+                padding: '10px 12px',
+                border: `1px solid ${colors.borderLight}`,
+                borderRadius: '8px',
+                backgroundColor: colors.light
+              }}>
+                <span style={{ fontFamily: fonts.mono, fontSize: '12px', color: colors.textDark }}>
+                  visibility:
+                </span>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: colors.text }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(isPublic)}
+                    onChange={(e) => updateChecklistVisibility(e.target.checked)}
+                    disabled={updatingVisibility}
+                    style={{ cursor: updatingVisibility ? 'not-allowed' : 'pointer' }}
+                  />
+                  {isPublic ? 'public' : 'private'}
+                </label>
+                {updatingVisibility && (
+                  <span style={{ fontSize: '11px', color: colors.textMuted }}>
+                    saving...
+                  </span>
+                )}
+              </div>
+            )}
             
             {rules.length > 0 && (
               <RulesList 
@@ -733,9 +789,6 @@ export default function Home({ isAdmin = false }) {
 }
 
 export async function getServerSideProps({ req }) {
-  const xff = req.headers['x-forwarded-for']
-  const rawIp = Array.isArray(xff) ? xff[0] : (xff || req.socket?.remoteAddress || '')
-  const clientIp = normalizeIp((rawIp || '').split(',')[0].trim())
-  const isAdmin = ADMIN_IPS.includes(clientIp)
+  const isAdmin = true
   return { props: { isAdmin } }
 }
