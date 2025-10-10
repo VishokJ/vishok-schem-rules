@@ -24,6 +24,7 @@ export default function Home({ isAdmin = false }) {
   const [pdfUrl, setPdfUrl] = useState(null)
   const [pdfLoading, setPdfLoading] = useState(false)
   const [partsLoading, setPartsLoading] = useState(false)
+  const [checklists, setChecklists] = useState([])
   const [checklistId, setChecklistId] = useState(null)
   const [isPublic, setIsPublic] = useState(null)
   const [updatingVisibility, setUpdatingVisibility] = useState(false)
@@ -73,6 +74,18 @@ export default function Home({ isAdmin = false }) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  function normalizeBoolean(value) {
+    if (value === true || value === false) return value
+    if (value === 1 || value === '1') return true
+    if (value === 0 || value === '0') return false
+    if (typeof value === 'string') {
+      const v = value.toLowerCase()
+      if (v === 'true' || v === 't' || v === 'yes' || v === 'y') return true
+      if (v === 'false' || v === 'f' || v === 'no' || v === 'n') return false
+    }
+    return Boolean(value)
+  }
+
   async function fetchParts() {
     setPartsLoading(true)
     try {
@@ -120,25 +133,28 @@ export default function Home({ isAdmin = false }) {
 
       if (partError) throw partError
 
-      const { data: checklistData, error: checklistError } = await supabase
+      const { data: checklistRows, error: checklistError } = await supabase
         .from('schematic_checklist')
-        .select('uuid,is_public')
+        .select('uuid,is_public,name,updated_at,created_at')
         .eq('part_id', partId)
-        .single()
+        .order('updated_at', { ascending: false, nullsFirst: false })
 
       if (checklistError) throw checklistError
 
-      const { data: rulesData, error: rulesError } = await supabase
-        .from('schematic_rule')
-        .select('*')
-        .eq('checklist_id', checklistData.uuid)
-
-      if (rulesError) throw rulesError
-
       setPartData(partData)
-      setChecklistId(checklistData.uuid)
-      setIsPublic(Boolean(checklistData.is_public))
-      setRules(rulesData || [])
+      const allChecklists = Array.isArray(checklistRows) ? checklistRows : []
+      setChecklists(allChecklists)
+
+      if (allChecklists.length === 0) {
+        setChecklistId(null)
+        setIsPublic(null)
+        setRules([])
+      } else {
+        const preferred = allChecklists.find(c => normalizeBoolean(c.is_public)) || allChecklists[0]
+        setChecklistId(preferred.uuid)
+        setIsPublic(normalizeBoolean(preferred.is_public))
+        await fetchRulesForChecklist(preferred.uuid)
+      }
 
       if (partData.file_path) {
         await fetchPresignedUrl(partData.file_path)
@@ -150,18 +166,37 @@ export default function Home({ isAdmin = false }) {
     }
   }
 
+  async function fetchRulesForChecklist(id) {
+    try {
+      if (!id) {
+        setRules([])
+        return
+      }
+      const { data: rulesData, error: rulesError } = await supabase
+        .from('schematic_rule')
+        .select('*')
+        .eq('checklist_id', id)
+
+      if (rulesError) throw rulesError
+      setRules(rulesData || [])
+    } catch (error) {
+      console.error('Error fetching rules:', error)
+    }
+  }
+
   async function updateChecklistVisibility(nextPublic) {
     try {
       if (!checklistId) return
       setUpdatingVisibility(true)
       const { error } = await supabase
         .from('schematic_checklist')
-        .update({ is_public: nextPublic })
+        .update({ is_public: nextPublic ? true : false })
         .eq('uuid', checklistId)
 
       if (error) throw error
 
-      setIsPublic(nextPublic)
+      setIsPublic(normalizeBoolean(nextPublic))
+      setChecklists(prev => prev.map(c => c.uuid === checklistId ? { ...c, is_public: nextPublic ? true : false } : c))
     } catch (error) {
       console.error('Error updating checklist visibility:', error)
       alert('Failed to update visibility. Please try again.')
@@ -234,7 +269,7 @@ export default function Home({ isAdmin = false }) {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(ruleData)
+        body: JSON.stringify({ ...ruleData, checklistId: checklistId, partId: selectedPartId })
       })
 
       const data = await response.json()
@@ -690,7 +725,7 @@ export default function Home({ isAdmin = false }) {
             {/* {partData.pin_table && (
               <PinTable pinData={partData.pin_table} />
             )} */}
-            {isAdmin && checklistId && (
+            {isAdmin && checklists.length > 0 && (
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -701,6 +736,36 @@ export default function Home({ isAdmin = false }) {
                 borderRadius: '8px',
                 backgroundColor: colors.light
               }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontFamily: fonts.mono, fontSize: '12px', color: colors.textDark }}>
+                    checklist:
+                  </span>
+                  <select 
+                    value={checklistId || ''}
+                    onChange={async (e) => {
+                      const id = e.target.value
+                      setChecklistId(id)
+                      const selected = checklists.find(c => c.uuid === id)
+                      setIsPublic(normalizeBoolean(selected?.is_public))
+                      await fetchRulesForChecklist(id)
+                    }}
+                    style={{ 
+                      padding: '6px 8px', 
+                      fontSize: '12px',
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '6px',
+                      backgroundColor: colors.white,
+                      color: colors.text
+                    }}
+                  >
+                    {checklists.map(c => (
+                      <option key={c.uuid} value={c.uuid}>
+                        {(c.name || c.uuid).slice(0, 40)} · {normalizeBoolean(c.is_public) ? 'public' : 'private'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ width: '1px', height: '18px', backgroundColor: colors.borderLight }} />
                 <span style={{ fontFamily: fonts.mono, fontSize: '12px', color: colors.textDark }}>
                   visibility:
                 </span>

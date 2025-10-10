@@ -7,21 +7,26 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { partId, content, category, level } = req.body
+    const { partId, content, category, level, checklistId } = req.body
 
     if (!partId || !content) {
       return res.status(400).json({ error: 'Part ID and content are required' })
     }
 
-    // Get the checklist for this part
-    const { data: checklistData, error: checklistError } = await supabase
-      .from('schematic_checklist')
-      .select('uuid')
-      .eq('part_id', partId)
-      .single()
+    // Resolve checklist
+    let resolvedChecklistId = checklistId
+    if (!resolvedChecklistId) {
+      const { data: rows, error: checklistError } = await supabase
+        .from('schematic_checklist')
+        .select('uuid,is_public,updated_at')
+        .eq('part_id', partId)
+        .order('updated_at', { ascending: false })
 
-    if (checklistError) {
-      return res.status(404).json({ error: 'Checklist not found for this part' })
+      if (checklistError || !rows || rows.length === 0) {
+        return res.status(404).json({ error: 'Checklist not found for this part' })
+      }
+      const preferred = rows.find(r => r.is_public) || rows[0]
+      resolvedChecklistId = preferred.uuid
     }
 
     // Create new rule
@@ -31,7 +36,7 @@ export default async function handler(req, res) {
       content: content.trim(),
       category: category || 'Uncategorized',
       level: level || 'RECOMMENDED',
-      checklist_id: checklistData.uuid,
+      checklist_id: resolvedChecklistId,
       is_deleted: false,
       pins: [],
       created_at: new Date().toISOString(),
