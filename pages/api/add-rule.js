@@ -37,6 +37,7 @@ export default async function handler(req, res) {
       category: category || 'Uncategorized',
       level: level || 'RECOMMENDED',
       checklist_id: resolvedChecklistId,
+      is_conditional: false,
       is_deleted: false,
       pins: [],
       created_at: new Date().toISOString(),

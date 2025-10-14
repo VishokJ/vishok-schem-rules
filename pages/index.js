@@ -787,15 +787,13 @@ export default function Home({ isAdmin = false }) {
               </div>
             )}
             
-            {rules.length > 0 && (
-              <RulesList 
-                rules={rules} 
-                onUpdateRule={updateRule} 
-                onAddRule={addRule}
-                onDeleteRule={deleteRule}
-                partId={selectedPartId}
-              />
-            )}
+            <RulesList 
+              rules={rules} 
+              onUpdateRule={updateRule} 
+              onAddRule={addRule}
+              onDeleteRule={deleteRule}
+              partId={selectedPartId}
+            />
           </div>
         )}
         

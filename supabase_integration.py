@@ -98,6 +98,7 @@ class SupabaseIntegration:
                 rule_data = {
                     'uuid': rule_uuid,
                     'content': clean_text_for_db(rule.get('rule', '')),
+                    'is_conditional': False,
                     'is_deleted': False,
                     'checklist_id': checklist_id,
                     'category': clean_text_for_db(rule.get('category', 'Uncategorized')),
